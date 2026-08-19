@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import {
   Alert,
+  Autocomplete,
   Button,
   Card,
   MenuItem,
@@ -15,53 +16,63 @@ import {
 } from "@mui/material";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { environmentApi, userAssignmentApi } from "../../../api/resources";
+import { userApi } from "../../../api/users";
 import { getApiErrorMessage } from "../../../api/client";
-import { ApiGapNotice } from "../../../components/common/ApiGapNotice";
 import { EnvironmentChip } from "../../../components/common/EnvironmentChip";
 import { SignalLamp } from "../../../components/common/SignalLamp";
 import { LoadingState, EmptyState } from "../../../components/common/States";
 import { environmentColor } from "../../../theme";
-import type { EnvironmentResponse, UserAssignmentResponse } from "../../../types";
+import type { EnvironmentResponse, UserAssignmentResponse, UserResponse } from "../../../types";
 import { useAuth } from "../../../context/AuthContext";
 
 export function TargetingTab({ flagId }: { flagId: number }) {
   const { isAdmin } = useAuth();
   const [environments, setEnvironments] = useState<EnvironmentResponse[]>([]);
+  const [users, setUsers] = useState<UserResponse[]>([]);
+  const [assignments, setAssignments] = useState<UserAssignmentResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const [userId, setUserId] = useState("");
+  const [selectedUser, setSelectedUser] = useState<UserResponse | null>(null);
   const [environmentId, setEnvironmentId] = useState<number | "">("");
   const [enabled, setEnabled] = useState(true);
 
-  // Session-local record of assignments set here — the API has no GET to
-  // list existing assignments, so this only reflects what THIS session set.
-  const [sessionAssignments, setSessionAssignments] = useState<UserAssignmentResponse[]>([]);
+  function loadAssignments(envs: EnvironmentResponse[]) {
+    return Promise.all(
+      envs.map((env) => userAssignmentApi.list(flagId, env.id)),
+    ).then((lists) => setAssignments(lists.flat()));
+  }
 
   useEffect(() => {
-    environmentApi
-      .listActive()
-      .then(setEnvironments)
-      .catch((err) => setError(getApiErrorMessage(err)))
-      .finally(() => setLoading(false));
-  }, []);
+    let active = true;
+    Promise.all([environmentApi.listActive(), userApi.list()])
+      .then(async ([envs, allUsers]) => {
+        if (!active) return;
+        setEnvironments(envs);
+        setUsers(allUsers);
+        await loadAssignments(envs);
+      })
+      .catch((err) => active && setError(getApiErrorMessage(err)))
+      .finally(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flagId]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (environmentId === "") return;
+    if (environmentId === "" || !selectedUser) return;
     setError(null);
     setSubmitting(true);
     try {
-      const assignment = await userAssignmentApi.configure(flagId, environmentId, {
-        user_id: Number(userId),
+      await userAssignmentApi.configure(flagId, environmentId, {
+        user_id: selectedUser.id,
         enabled,
       });
-      setSessionAssignments((prev) => [
-        assignment,
-        ...prev.filter((a) => !(a.user_id === assignment.user_id && a.environment_id === assignment.environment_id)),
-      ]);
-      setUserId("");
+      await loadAssignments(environments);
+      setSelectedUser(null);
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
@@ -73,13 +84,13 @@ export function TargetingTab({ flagId }: { flagId: number }) {
     setError(null);
     try {
       await userAssignmentApi.remove(assignment.id);
-      setSessionAssignments((prev) => prev.filter((a) => a.id !== assignment.id));
+      setAssignments((prev) => prev.filter((a) => a.id !== assignment.id));
     } catch (err) {
       setError(getApiErrorMessage(err));
     }
   }
 
-  if (loading) return <LoadingState label="Loading environments…" />;
+  if (loading) return <LoadingState label="Loading targeting…" />;
 
   if (!isAdmin) {
     return (
@@ -91,11 +102,6 @@ export function TargetingTab({ flagId }: { flagId: number }) {
 
   return (
     <Stack spacing={2.5}>
-      <ApiGapNotice
-        endpoint="GET /feature-flags/{id}/environments/{env_id}/users"
-        note="The repository already supports listing assignments per flag+environment, but no route exposes it yet, and there's no /users list either. The table below only shows assignments set in this browser session — refreshing the page loses it. Enter a user ID directly for now."
-      />
-
       {error && <Alert severity="error">{error}</Alert>}
 
       <Card sx={{ p: 2.5 }}>
@@ -103,13 +109,14 @@ export function TargetingTab({ flagId }: { flagId: number }) {
           Assign a user
         </Typography>
         <Stack component="form" onSubmit={handleSubmit} direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "flex-end" }}>
-          <TextField
-            label="User ID"
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-            type="number"
-            required
-            sx={{ width: { xs: "100%", sm: 140 } }}
+          <Autocomplete
+            options={users}
+            value={selectedUser}
+            onChange={(_, v) => setSelectedUser(v)}
+            getOptionLabel={(u) => `${u.username} (#${u.id})`}
+            isOptionEqualToValue={(a, b) => a.id === b.id}
+            sx={{ flex: 1, minWidth: 220 }}
+            renderInput={(params) => <TextField {...params} label="User" required />}
           />
           <TextField
             select
@@ -143,10 +150,10 @@ export function TargetingTab({ flagId }: { flagId: number }) {
 
       <Card sx={{ p: 2.5 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2 }}>
-          Assignments set this session
+          Targeted users
         </Typography>
-        {sessionAssignments.length === 0 ? (
-          <EmptyState title="No assignments yet" description="Assignments you save above will appear here." />
+        {assignments.length === 0 ? (
+          <EmptyState title="No users targeted yet" description="Assignments you save above will appear here." />
         ) : (
           <Table size="small">
             <TableHead>
@@ -158,11 +165,14 @@ export function TargetingTab({ flagId }: { flagId: number }) {
               </TableRow>
             </TableHead>
             <TableBody>
-              {sessionAssignments.map((a) => {
+              {assignments.map((a) => {
                 const env = environments.find((e) => e.id === a.environment_id);
+                const user = users.find((u) => u.id === a.user_id);
                 return (
                   <TableRow key={a.id}>
-                    <TableCell sx={{ fontFamily: '"JetBrains Mono", monospace' }}>#{a.user_id}</TableCell>
+                    <TableCell>
+                      {user ? user.username : <span style={{ fontFamily: "monospace" }}>#{a.user_id}</span>}
+                    </TableCell>
                     <TableCell>{env && <EnvironmentChip name={env.name} />}</TableCell>
                     <TableCell>
                       <SignalLamp on={a.enabled} label={a.enabled ? "Enabled" : "Disabled"} color={env ? environmentColor(env.name) : undefined} size="small" />

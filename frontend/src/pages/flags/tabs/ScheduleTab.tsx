@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
+import axios from "axios";
 import { Alert, Button, Card, Grid, Stack, Typography } from "@mui/material";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { environmentApi, scheduleApi } from "../../../api/resources";
 import { getApiErrorMessage } from "../../../api/client";
 import { EnvironmentChip } from "../../../components/common/EnvironmentChip";
 import { LoadingState } from "../../../components/common/States";
-import { ApiGapNotice } from "../../../components/common/ApiGapNotice";
 import type { EnvironmentResponse } from "../../../types";
 import { useAuth } from "../../../context/AuthContext";
 
@@ -14,18 +14,55 @@ export function ScheduleTab({ flagId }: { flagId: number }) {
   const [environments, setEnvironments] = useState<EnvironmentResponse[]>([]);
   const [start, setStart] = useState<Record<number, Date | null>>({});
   const [end, setEnd] = useState<Record<number, Date | null>>({});
+  const [configured, setConfigured] = useState<Record<number, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Record<number, string | null>>({});
   const [savingId, setSavingId] = useState<number | null>(null);
   const [successId, setSuccessId] = useState<number | null>(null);
 
   useEffect(() => {
+    let active = true;
+
     environmentApi
       .listActive()
-      .then(setEnvironments)
-      .catch((err) => setError({ 0: getApiErrorMessage(err) }))
-      .finally(() => setLoading(false));
-  }, []);
+      .then(async (envs) => {
+        if (!active) return;
+        setEnvironments(envs);
+
+        const startMap: Record<number, Date | null> = {};
+        const endMap: Record<number, Date | null> = {};
+        const configuredMap: Record<number, boolean> = {};
+
+        await Promise.all(
+          envs.map(async (env) => {
+            try {
+              const schedule = await scheduleApi.get(flagId, env.id);
+              startMap[env.id] = schedule.scheduled_start_at ? new Date(schedule.scheduled_start_at) : null;
+              endMap[env.id] = schedule.scheduled_end_at ? new Date(schedule.scheduled_end_at) : null;
+              configuredMap[env.id] = true;
+            } catch (err) {
+              // 404 just means this environment hasn't been enabled for the
+              // flag yet, so there's nothing to schedule until it is.
+              if (axios.isAxiosError(err) && err.response?.status === 404) {
+                configuredMap[env.id] = false;
+              } else {
+                configuredMap[env.id] = true;
+              }
+            }
+          }),
+        );
+
+        if (!active) return;
+        setStart(startMap);
+        setEnd(endMap);
+        setConfigured(configuredMap);
+      })
+      .finally(() => active && setLoading(false));
+
+    return () => {
+      active = false;
+    };
+  }, [flagId]);
 
   async function save(environmentId: number) {
     setError((prev) => ({ ...prev, [environmentId]: null }));
@@ -44,7 +81,7 @@ export function ScheduleTab({ flagId }: { flagId: number }) {
     }
   }
 
-  if (loading) return <LoadingState label="Loading environments…" />;
+  if (loading) return <LoadingState label="Loading schedules…" />;
 
   if (!isAdmin) {
     return (
@@ -56,10 +93,6 @@ export function ScheduleTab({ flagId }: { flagId: number }) {
 
   return (
     <Stack spacing={2.5}>
-      <ApiGapNotice
-        endpoint="GET /feature-flags/{id}/environments/{env_id}/schedule"
-        note="The API only exposes a PUT to set the schedule, so an existing schedule can't be read back here — this form always starts blank. Enable the environment for this flag first, or saving will fail with 'schedule not found'."
-      />
       <Typography variant="body2" color="text.secondary">
         Set a window during which this flag should turn on automatically. Leave a field empty to clear it.
       </Typography>
@@ -68,8 +101,20 @@ export function ScheduleTab({ flagId }: { flagId: number }) {
           <Grid size={{ xs: 12, md: 6 }} key={env.id}>
             <Card sx={{ p: 2.5 }}>
               <Stack spacing={2}>
-                <EnvironmentChip name={env.name} />
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <EnvironmentChip name={env.name} />
+                  {!configured[env.id] && (
+                    <Typography variant="caption" color="text.secondary">
+                      Not enabled for this flag yet
+                    </Typography>
+                  )}
+                </Stack>
                 {error[env.id] && <Alert severity="error">{error[env.id]}</Alert>}
+                {!configured[env.id] && (
+                  <Alert severity="info" variant="outlined" sx={{ fontSize: "0.8rem" }}>
+                    Enable this flag for {env.name} on the Environments tab before setting a schedule.
+                  </Alert>
+                )}
                 <DateTimePicker
                   label="Starts at"
                   value={start[env.id] ?? null}
@@ -83,7 +128,12 @@ export function ScheduleTab({ flagId }: { flagId: number }) {
                   slotProps={{ textField: { fullWidth: true, size: "small" } }}
                 />
                 <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Button variant="contained" size="small" disabled={savingId === env.id} onClick={() => save(env.id)}>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    disabled={savingId === env.id || !configured[env.id]}
+                    onClick={() => save(env.id)}
+                  >
                     {savingId === env.id ? "Saving…" : "Save schedule"}
                   </Button>
                   {successId === env.id && (

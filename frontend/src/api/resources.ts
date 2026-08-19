@@ -128,6 +128,13 @@ export const userAssignmentApi = {
       )
       .then((r) => r.data),
 
+  list: (featureFlagId: number, environmentId: number) =>
+    apiClient
+      .get<UserAssignmentResponse[]>(
+        `/feature-flags/${featureFlagId}/environments/${environmentId}/users`,
+      )
+      .then((r) => r.data),
+
   remove: (assignmentId: number) =>
     apiClient
       .delete(`/feature-flags/user-assignments/${assignmentId}`)
@@ -138,6 +145,13 @@ export const userAssignmentApi = {
 // Feature Scheduling
 // -------------------------------------------------
 export const scheduleApi = {
+  get: (featureFlagId: number, environmentId: number) =>
+    apiClient
+      .get<FeatureScheduleResponse>(
+        `/feature-flags/${featureFlagId}/environments/${environmentId}/schedule`,
+      )
+      .then((r) => r.data),
+
   update: (
     featureFlagId: number,
     environmentId: number,
