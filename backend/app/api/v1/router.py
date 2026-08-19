@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.auth import router as auth_router
+from app.api.v1.users import router as users_router
 from app.api.v1.environment import router as environment_router
 from app.api.v1.feature_flag import router as feature_flag_router
 from app.api.v1.rollout import router as rollout_router
@@ -21,6 +22,9 @@ api_router = APIRouter()
 
 api_router.include_router(
     auth_router,
+)
+api_router.include_router(
+    users_router,
 )
 api_router.include_router(
     environment_router,

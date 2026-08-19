@@ -220,3 +220,17 @@ export interface ApiErrorBody {
   success: false;
   message: string;
 }
+
+// ---- users.py (admin-only user management, added) ----
+export interface UserCreateRequest {
+  username: string;
+  email: string;
+  password: string;
+  role: UserRole;
+}
+
+export interface UserRoleUpdateRequest {
+  email?: string | null;
+  is_active?: boolean | null;
+  role?: UserRole | null;
+}

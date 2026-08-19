@@ -34,6 +34,13 @@ class UserRepository:
             )
         )
 
+    def get_all(self) -> list[User]:
+        return list(
+            self.db.scalars(
+                select(User).order_by(User.id)
+            ).all()
+        )
+
     def create(self, user: User) -> User:
         self.db.add(user)
         self.db.flush()

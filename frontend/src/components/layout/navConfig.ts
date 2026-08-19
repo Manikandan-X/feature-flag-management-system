@@ -3,6 +3,7 @@ import ToggleOnRoundedIcon from "@mui/icons-material/ToggleOnRounded";
 import DnsRoundedIcon from "@mui/icons-material/DnsRounded";
 import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
+import ManageAccountsRoundedIcon from "@mui/icons-material/ManageAccountsRounded";
 import type { SvgIconComponent } from "@mui/icons-material";
 
 export interface NavItem {
@@ -18,4 +19,5 @@ export const navItems: NavItem[] = [
   { label: "Environments", path: "/environments", icon: DnsRoundedIcon },
   { label: "Analytics", path: "/analytics", icon: InsightsRoundedIcon, adminOnly: true },
   { label: "Audit Log", path: "/audit-logs", icon: HistoryRoundedIcon, adminOnly: true },
+  { label: "Users", path: "/users", icon: ManageAccountsRoundedIcon, adminOnly: true },
 ];

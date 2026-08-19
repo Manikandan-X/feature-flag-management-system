@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app.core.permissions import require_admin
+from app.core.permissions import require_admin, require_employee
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.feature_rollout import (
@@ -73,6 +73,28 @@ def configure_user_assignment(
         environment_id,
         data,
         current_user.id,
+    )
+
+
+# -------------------------------------------------
+# List User Assignments (added)
+# -------------------------------------------------
+
+@router.get(
+    "/{feature_flag_id}/environments/{environment_id}/users",
+    response_model=list[UserAssignmentResponse],
+)
+def get_user_assignments(
+    feature_flag_id: int,
+    environment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_employee),
+):
+    service = UserAssignmentService(db)
+
+    return service.get_by_feature_environment(
+        feature_flag_id,
+        environment_id,
     )
 
 

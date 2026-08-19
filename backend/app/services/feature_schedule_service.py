@@ -59,6 +59,46 @@ class FeatureScheduleService:
             AuditLogService(db)
         )
 
+    # -------------------------------------------------
+    # Get Schedule (added)
+    # -------------------------------------------------
+
+    def get_schedule(
+        self,
+        feature_flag_id: int,
+        environment_id: int,
+    ):
+
+        feature_flag = (
+            self.feature_flag_repository.get_by_id(
+                feature_flag_id
+            )
+        )
+
+        if not feature_flag:
+            raise FeatureFlagNotFoundException()
+
+        environment = (
+            self.environment_repository.get_by_id(
+                environment_id
+            )
+        )
+
+        if not environment:
+            raise EnvironmentNotFoundException()
+
+        configuration = (
+            self.repository.get_by_feature_and_environment(
+                feature_flag_id,
+                environment_id,
+            )
+        )
+
+        if not configuration:
+            raise FeatureScheduleNotFoundException()
+
+        return configuration
+
     def update_schedule(
         self,
         feature_flag_id: int,

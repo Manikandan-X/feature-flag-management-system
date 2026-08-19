@@ -9,6 +9,7 @@ import { FlagDetailPage } from "./pages/flags/FlagDetailPage";
 import { EnvironmentsPage } from "./pages/environments/EnvironmentsPage";
 import { AnalyticsPage } from "./pages/analytics/AnalyticsPage";
 import { AuditLogsPage } from "./pages/audit/AuditLogsPage";
+import { UsersPage } from "./pages/users/UsersPage";
 import { ProfilePage } from "./pages/profile/ProfilePage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
@@ -30,6 +31,7 @@ export default function App() {
           <Route element={<ProtectedRoute adminOnly />}>
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/audit-logs" element={<AuditLogsPage />} />
+            <Route path="/users" element={<UsersPage />} />
           </Route>
         </Route>
       </Route>

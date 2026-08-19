@@ -187,6 +187,39 @@ class UserAssignmentService:
         return assignment
 
     # -------------------------------------------------
+    # List User Assignments for a Feature Flag + Environment (added)
+    # -------------------------------------------------
+
+    def get_by_feature_environment(
+        self,
+        feature_flag_id: int,
+        environment_id: int,
+    ) -> list[UserAssignment]:
+
+        feature_flag = (
+            self.feature_flag_repository.get_by_id(
+                feature_flag_id
+            )
+        )
+
+        if not feature_flag:
+            raise FeatureFlagNotFoundException()
+
+        environment = (
+            self.environment_repository.get_by_id(
+                environment_id
+            )
+        )
+
+        if not environment:
+            raise EnvironmentNotFoundException()
+
+        return self.repository.get_by_feature_environment(
+            feature_flag_id,
+            environment_id,
+        )
+
+    # -------------------------------------------------
     # Delete User Assignment
     # -------------------------------------------------
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.permissions import require_admin
+from app.core.permissions import require_admin, require_employee
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.feature_schedule import (
@@ -17,6 +17,25 @@ router = APIRouter(
     prefix="/feature-flags",
     tags=["Feature Scheduling"],
 )
+
+
+@router.get(
+    "/{feature_flag_id}/environments/{environment_id}/schedule",
+    response_model=FeatureScheduleResponse,
+)
+def get_feature_schedule(
+    feature_flag_id: int,
+    environment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_employee),
+):
+
+    service = FeatureScheduleService(db)
+
+    return service.get_schedule(
+        feature_flag_id=feature_flag_id,
+        environment_id=environment_id,
+    )
 
 
 @router.put(

@@ -1,5 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field
 
+from app.core.constants import UserRole
+
 
 class UserCreate(BaseModel):
     username: str = Field(
@@ -33,3 +35,34 @@ class UserResponse(BaseModel):
     model_config = {
         "from_attributes": True,
     }
+
+
+# -------------------------------------------------
+# Admin user management (added)
+# -------------------------------------------------
+
+class UserCreateRequest(BaseModel):
+    """Used by the admin-only "create user" endpoint, role given by name
+    instead of role_id so the frontend never has to look up role IDs."""
+
+    username: str = Field(
+        min_length=3,
+        max_length=100,
+    )
+
+    email: EmailStr
+
+    password: str = Field(
+        min_length=8,
+        max_length=72,
+    )
+
+    role: UserRole
+
+
+class UserRoleUpdate(BaseModel):
+    """Used by the admin-only PATCH /users/{id} endpoint."""
+
+    email: EmailStr | None = None
+    is_active: bool | None = None
+    role: UserRole | None = None
