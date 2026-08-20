@@ -1,73 +1,129 @@
-# Signal — Feature Flag & Environment Management (Frontend)
+# Feature Flag & Environment Management System — Frontend
 
-React (Vite) + TypeScript + Material UI frontend for the Feature Flag & Environment
-Management System, built directly against the provided FastAPI backend's routes,
-schemas, and RBAC.
+**Signal** — a React frontend for controlling application features without
+redeploying code. Provides a dashboard, feature flag management with
+environment-scoped configuration, percentage-based rollouts, scheduled
+activation, user targeting, an audit log with rollback, analytics, and
+role-based admin/employee access.
 
-## Stack
-React 19 · Vite · TypeScript · MUI v7 · Axios · React Router v7 · Chart.js (react-chartjs-2)
+## Tech Stack
 
-## Setup
+- **Framework:** React 19 + Vite
+- **Language:** TypeScript
+- **UI:** Material UI (MUI) v7
+- **HTTP client:** Axios
+- **Routing:** React Router v7
+- **Charts:** Chart.js (react-chartjs-2)
+- **Linting:** oxlint
+
+---
+
+## Project Structure
+
+```
+frontend/
+  public/
+  src/
+    api/          axios client + one module per backend resource
+    assets/
+    components/   shared UI (layout/nav, cards, chips, states) and
+                   feature-specific components (flags, users)
+    context/       AuthContext — login/register/me/logout, token refresh
+    hooks/
+    pages/         one folder per route (auth, dashboard, flags, environments,
+                   analytics, audit, users, profile)
+    theme/         design tokens + MUI theme
+    types/         TypeScript types mirroring backend schemas
+    utils/         formatting helpers
+    App.tsx        route definitions
+    main.tsx       app entry point, providers
+  .env.example
+  .oxlintrc.json
+  index.html
+  package.json
+  tsconfig.json
+  vite.config.ts
+```
+
+---
+
+## Getting Started
+
+### 1. Prerequisites
+
+- Node.js 18+
+- The backend API running (see the backend README)
+
+### 2. Install dependencies
 
 ```bash
+cd frontend
 npm install
-cp .env.example .env   # edit VITE_API_BASE_URL if your API isn't on localhost:8000
+```
+
+### 3. Configure environment variables
+
+```bash
+cp .env.example .env
+```
+
+```env
+VITE_API_BASE_URL=http://localhost:8000/api/v1
+```
+
+Point this at wherever the backend is running.
+
+### 4. Run the development server
+
+```bash
 npm run dev
 ```
 
-The app expects the backend at `VITE_API_BASE_URL` (default `http://localhost:8000/api/v1`).
-CORS must allow this frontend's origin on the FastAPI side.
+The app runs at `http://localhost:5173` by default.
 
-## Auth & roles
+---
 
-- New accounts register as `EMPLOYEE` (read-only: dashboard, flags, environments).
-- `ADMIN` accounts additionally get create/edit on flags & environments, rollout %,
-  scheduling, user targeting, Analytics, and Audit Log + rollback.
-- Access/refresh tokens are stored in `localStorage`; a 401 triggers a silent
-  refresh-and-retry once, then redirects to `/login`.
+## Available Scripts
 
-## Design system
+| Command | Description |
+|---|---|
+| `npm run dev` | Start the Vite development server with hot reload |
+| `npm run build` | Type-check and build a production bundle to `dist/` |
+| `npm run preview` | Preview the production build locally |
+| `npm run lint` | Lint the codebase with oxlint |
 
-Dark "control room / patch panel" theme (`src/theme/index.ts`) — feature flags are
-literally on/off signals routed to environments, so the whole UI borrows that visual
-language instead of generic dashboard chrome:
+---
 
-- Each environment gets its own accent color (violet=development, amber=testing,
-  coral=production) used consistently in chips, charts, and cards.
-- The signature `SignalLamp` component (`src/components/common/SignalLamp.tsx`)
-  renders on/off state as a glowing patch-panel indicator lamp instead of a plain
-  switch, used on the dashboard, flag list, and environment toggles.
-- Space Grotesk for headings, Inter for body text, JetBrains Mono for flag keys,
-  IDs, and timestamps.
+## Authentication & Roles
 
-## Known backend gaps (flagged in-app, not silently hidden)
+- New accounts register via the sign-up page and are created as
+  **EMPLOYEE** — read-only access to the dashboard, feature flags, and
+  environments.
+- **ADMIN** accounts additionally get create/edit access on flags and
+  environments, rollout percentages, scheduling, user targeting, user
+  management, Analytics, and the Audit Log with rollback.
+- Access and refresh tokens are stored client-side; an expired access token
+  is refreshed automatically and the request retried once before falling
+  back to the login screen.
 
-Three pieces of functionality are write-only because the backend doesn't expose a
-GET route for them yet, even though the underlying data/repo methods exist. Each
-spot in the UI shows an amber "Backend endpoint needed" notice:
+---
 
-1. **No `/users` list endpoint** — user targeting requires typing a raw user ID
-   (Flag detail → Targeting tab).
-2. **No GET for user assignments per flag+environment** — `UserAssignmentRepository.get_by_feature_environment()`
-   exists but isn't routed. The Targeting tab only shows assignments set during
-   the current browser session.
-3. **No GET for a flag's schedule** — only `PUT /feature-flags/{id}/environments/{env_id}/schedule`
-   exists, so the Schedule tab can set a new window but can't show what's
-   currently active. It also requires the environment to already be enabled for
-   the flag (the service raises `FeatureScheduleNotFoundException` otherwise).
+## Design System
 
-Adding three small GET routes (reusing existing repository/service methods) would
-close all three gaps — happy to write them if you want them in the backend.
+The interface uses a dark "control room / patch panel" theme, defined in
+`src/theme/index.ts`. Each environment (development, testing, production)
+has its own accent color, used consistently across chips, charts, and
+status indicators. A custom `SignalLamp` component renders on/off state as
+a glowing indicator lamp rather than a plain switch, used throughout the
+dashboard, flag list, and environment controls.
 
-## Structure
+---
 
+## Building for Production
+
+```bash
+npm run build
 ```
-src/
-  api/            axios client + one module per backend resource
-  components/     layout (shell, nav, route guards) + shared UI (SignalLamp, cards, states)
-  context/        AuthContext (login/register/me/logout, token refresh)
-  pages/          one folder per route; flags/tabs/ holds the 6 flag-detail tabs
-  theme/          design tokens + MUI theme
-  types/          TypeScript types mirroring backend Pydantic schemas exactly
-  utils/          audit log label/color/formatting helpers
-```
+
+Outputs a static, production-ready bundle to `dist/`, which can be served
+by any static file host or reverse proxy in front of the backend API.
